@@ -1,0 +1,75 @@
+Requirements:
+Cmake
+Cuda
+Nvidia GPU
+Git
+
+Create C:/lora directory
+
+Clone llama.cpp in C:/lora directory with git bash:
+git clone https://github.com/ggerganov/llama.cpp.git
+
+Build llama.cpp by creating a build directory:
+mkdir .\llama.cpp\build
+
+CD into the build directory:
+cd .\llama.cpp\build
+
+Generate project files:
+cmake .. -G "Visual Studio 17 2022" -A x64 -DLLAMA_CUBLAS=ON
+
+Build project files:
+cmake --build . --config Release
+
+Copy contents of C:\lora\llama.cpp\build\bin\Release to C:\lora\llama.cpp
+
+Download files from repo and place into C:/lora:
+https://huggingface.co/mistralai/Mistral-7B-v0.1/tree/main
+
+model-00001-of-00002.safetensors
+model-00002-of-00002.safetensors
+pytorch_model.bin.index.json
+special_tokens_map.json
+tokenizer.json
+tokenizer.model
+tokenizer_config.json
+config.json
+generation_config.json
+
+Create python environment in C:/lora/llama.cpp:
+python -m venv .venv
+
+Activate python evnironment:
+Bash:
+.\.venv\Scripts\activate.bat
+
+Powershell:
+.\.venv\Scripts\Activate.ps1
+
+Install dependencies:
+pip install -r requirements.txt
+
+While in python environment, cd to C:/lora
+
+Run convert.py:
+python llama.cpp\convert.py model-00001-of-00002.safetensors --outtype f32 --outfile converted.gguf --ctx 2048
+
+In normal powershell window in C:/lora directory, run command to begin training:
+llama.cpp/finetune.exe --model-base converted.gguf --train-data instruction.txt --lora-out lora.gguf --save-every 0 --threads 24 --ctx 16 --rope-freq-base 10000 --rope-freq-scale 1.0 --batch 1 --grad-acc 1 --adam-iter 256 --adam-alpha 0.001 --lora-r 4 --lora-alpha 4 --use-checkpointing --sample-start "\n" --escape --include-sample-start --seed 1 -ngl 8
+
+Once the training is done, a lora.gguf file is made. Run this command to merge it with the original model:
+llama.cpp\export-lora.exe --model-base converted.gguf --model-out helios-model.gguf --lora-scaled lora.gguf 1.0
+
+Create a Modelfile on the server:
+FROM /home/syllith/helios-model.gguf
+PARAMETER temperature .5
+PARAMETER num_ctx 1024
+
+SYSTEM """
+You are an expert assistant working at world wide technology.
+"""
+Transfer the helios-mode.gguf to linux and run this command:
+ollama create helios -f Modelfile
+
+To save changes to the model, edit the Modelfile then run:
+ollama update helios -f Modelfile
